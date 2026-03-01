@@ -23,7 +23,7 @@ Built for anyone managing large collections of folders across multiple locations
 <br>
 <img src="https://github.com/MajorFrenchy/Folder-compare/main/screenshot/sc01.jpg" 
      style="width: 50%; height: auto;" 
-     alt="VPX Merging Tool">
+     alt="Folder comparel">
 <br>
 
 ## 🚀 Usage
