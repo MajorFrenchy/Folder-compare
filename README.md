@@ -21,10 +21,9 @@ Built for anyone managing large collections of folders across multiple locations
 
 ---
 <br>
-<img src="![Screenshot](https://raw.githubusercontent.com/MajorFrenchy/Folder-compare/master/screenshot/sc01.jpg)" 
-     style="width: 50%; height: auto;" 
-     alt="VPX Merging Tool">
-
+<img src="https://raw.githubusercontent.com/MajorFrenchy/Folder-compare/master/screenshot/sc01.jpg" 
+     width="50%"
+     alt="Screenshot">
 <br>
 
 ## 🚀 Usage
