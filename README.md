@@ -20,6 +20,11 @@ Built for anyone managing large collections of folders across multiple locations
 - **No install required** — just open the HTML file in any browser
 
 ---
+<br>
+<img src="https://github.com/MajorFrenchy/Folder-compare/main/screenshot/sc01.jpg" 
+     style="width: 50%; height: auto;" 
+     alt="VPX Merging Tool">
+<br>
 
 ## 🚀 Usage
 
