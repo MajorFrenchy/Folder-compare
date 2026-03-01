@@ -22,6 +22,7 @@ Built for anyone managing large collections of folders across multiple locations
 ---
 <br>
 ![Screenshot](https://raw.githubusercontent.com/MajorFrenchy/Folder-compare/main/screenshot/sc01.jpg)
+
 <br>
 
 ## 🚀 Usage
