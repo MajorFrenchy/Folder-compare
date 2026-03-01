@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folder Compare</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
+    --accent: #e8ff4a; --accent2: #ff4a6e; --text: #e0e0f0; --muted: #5a5a7a;
+    --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
+  }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; padding:40px 24px; display:flex; flex-direction:column; align-items:center; }
+  header { width:100%; max-width:900px; margin-bottom:40px; display:flex; align-items:baseline; gap:16px; }
+  h1 { font-size:clamp(1.8rem,4vw,2.8rem); font-weight:800; letter-spacing:-0.03em; }
+  h1 span { color:var(--accent); }
+  .subtitle { font-family:var(--mono); font-size:0.75rem; color:var(--muted); }
+
+  .card { width:100%; max-width:900px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px; margin-bottom:24px; }
+  .inputs-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+  @media(max-width:620px){ .inputs-row { grid-template-columns:1fr; } }
+
+  .zone-wrap { display:flex; flex-direction:column; gap:8px; }
+  .zone-label { font-family:var(--mono); font-size:0.7rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; }
+
+  /* Big click target */
+  .pick-area {
+    border:2px dashed var(--border); border-radius:10px; min-height:160px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; cursor:pointer; transition:border-color 0.2s, background 0.2s;
+    padding:24px; text-align:center;
+  }
+  .pick-area:hover { border-color:var(--accent); background:rgba(232,255,74,0.03); }
+  .pick-area .icon { font-size:2.4rem; opacity:0.35; }
+  .pick-area .label { font-family:var(--mono); font-size:0.8rem; color:var(--muted); }
+  .pick-area:hover .label { color:var(--accent); }
+
+  /* Loaded card */
+  .loaded-box { display:none; flex-direction:column; gap:6px; }
+  .loaded-box.show { display:flex; }
+  .loaded-header { display:flex; align-items:center; justify-content:space-between; background:rgba(232,255,74,0.05); border:1px solid rgba(232,255,74,0.15); border-radius:8px; padding:9px 14px; }
+  .folder-badge { font-family:var(--mono); font-size:0.75rem; color:var(--accent); display:flex; align-items:center; gap:6px; overflow:hidden; }
+  .folder-badge span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+  .subfolder-count { font-family:var(--mono); font-size:0.68rem; color:var(--muted); white-space:nowrap; }
+  .clear-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:0.85rem; padding:0 4px; transition:color 0.15s; flex-shrink:0; }
+  .clear-btn:hover { color:var(--accent2); }
+
+  .preview-list { display:flex; flex-direction:column; gap:2px; max-height:180px; overflow-y:auto; }
+  .preview-list::-webkit-scrollbar { width:3px; }
+  .preview-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  .preview-item { font-family:var(--mono); font-size:0.72rem; color:var(--muted); padding:3px 8px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .preview-item:hover { background:rgba(255,255,255,0.04); color:var(--text); }
+  .preview-more { font-family:var(--mono); font-size:0.65rem; color:var(--muted); opacity:0.5; padding:3px 8px; font-style:italic; }
+  .warn { font-family:var(--mono); font-size:0.68rem; color:var(--accent2); padding:4px 8px; }
+
+  .dbg { font-family:var(--mono); font-size:0.63rem; color:var(--muted); opacity:0.5; margin-top:2px; word-break:break-all; min-height:1em; }
+
+  .options-row { display:flex; gap:20px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+  .toggle { display:flex; align-items:center; gap:8px; cursor:pointer; font-family:var(--mono); font-size:0.75rem; color:var(--muted); user-select:none; }
+  .toggle input { display:none; }
+  .toggle-pill { width:36px; height:20px; background:var(--border); border-radius:10px; position:relative; transition:background 0.2s; }
+  .toggle-pill::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; background:var(--muted); border-radius:50%; transition:transform 0.2s, background 0.2s; }
+  .toggle input:checked + .toggle-pill { background:var(--accent); }
+  .toggle input:checked + .toggle-pill::after { transform:translateX(16px); background:var(--bg); }
+
+  .btn { display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:var(--bg); border:none; border-radius:8px; padding:12px 28px; font-family:var(--sans); font-size:0.95rem; font-weight:700; cursor:pointer; transition:opacity 0.15s, transform 0.1s; }
+  .btn:hover { opacity:0.9; transform:translateY(-1px); }
+  .btn:active { transform:translateY(0); }
+  .btn:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+  .btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); padding:10px 18px; font-size:0.8rem; }
+  .btn-ghost:hover { color:var(--text); border-color:var(--muted); }
+
+  #results { display:none; }
+  .stats-bar { display:flex; gap:24px; margin-bottom:20px; flex-wrap:wrap; }
+  .stat { display:flex; flex-direction:column; gap:2px; }
+  .stat-value { font-size:2rem; font-weight:800; line-height:1; letter-spacing:-0.04em; }
+  .stat-label { font-family:var(--mono); font-size:0.68rem; color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; }
+  .stat-value.danger { color:var(--accent2); }
+  .stat-value.safe { color:var(--accent); }
+
+  .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .section-title { font-family:var(--mono); font-size:0.7rem; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; }
+  .folder-list { display:flex; flex-direction:column; gap:3px; max-height:440px; overflow-y:auto; }
+  .folder-list::-webkit-scrollbar { width:4px; }
+  .folder-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  .folder-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; font-family:var(--mono); font-size:0.8rem; animation:fadeIn 0.15s ease both; background:rgba(255,255,255,0.02); border:1px solid transparent; }
+  .folder-item:hover { border-color:var(--border); background:rgba(255,255,255,0.04); }
+  .folder-item.missing { color:var(--accent2); }
+  .folder-item.extra { color:var(--accent); }
+  @keyframes fadeIn { from{opacity:0;transform:translateX(-5px)} to{opacity:1;transform:translateX(0)} }
+  .empty-state { text-align:center; padding:40px; color:var(--muted); font-family:var(--mono); font-size:0.8rem; }
+  .divider { height:1px; background:var(--border); margin:20px 0; }
+  .copy-btn { font-family:var(--mono); font-size:0.68rem; background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:4px; padding:4px 10px; cursor:pointer; transition:all 0.15s; }
+  .copy-btn:hover { color:var(--text); border-color:var(--muted); }
+  .search-input { background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:0.75rem; padding:6px 12px; outline:none; width:180px; transition:border-color 0.2s; }
+  .search-input:focus { border-color:var(--accent); }
+  .search-input::placeholder { color:var(--muted); }
+  .sep { border-bottom:1px solid var(--border); margin:10px 0 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Folder<span>Diff</span></h1>
+  <span class="subtitle">// subfolder comparison</span>
+</header>
+
+<div class="card">
+  <div class="inputs-row">
+
+    <!-- Zone 1 -->
+    <div class="zone-wrap">
+      <div class="zone-label">Reference Folder</div>
+      <div class="pick-area" id="pickarea1" onclick="document.getElementById('input1').click()">
+        <div class="icon">📂</div>
+        <div class="label">Click to select folder</div>
+      </div>
+      <input type="file" id="input1" webkitdirectory multiple style="display:none" onchange="onFilePick(event,1)">
+      <div class="loaded-box" id="loaded1">
+        <div class="loaded-header">
+          <div class="folder-badge">📁 <span id="badge1-name"></span></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="subfolder-count" id="count1"></span>
+            <button class="clear-btn" onclick="clearZone(1)">✕</button>
+          </div>
+        </div>
+        <div class="preview-list" id="preview1"></div>
+      </div>
+      <div class="dbg" id="dbg1"></div>
+    </div>
+
+    <!-- Zone 2 -->
+    <div class="zone-wrap">
+      <div class="zone-label">Target Folder</div>
+      <div class="pick-area" id="pickarea2" onclick="document.getElementById('input2').click()">
+        <div class="icon">📂</div>
+        <div class="label">Click to select folder</div>
+      </div>
+      <input type="file" id="input2" webkitdirectory multiple style="display:none" onchange="onFilePick(event,2)">
+      <div class="loaded-box" id="loaded2">
+        <div class="loaded-header">
+          <div class="folder-badge">📁 <span id="badge2-name"></span></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="subfolder-count" id="count2"></span>
+            <button class="clear-btn" onclick="clearZone(2)">✕</button>
+          </div>
+        </div>
+        <div class="preview-list" id="preview2"></div>
+      </div>
+      <div class="dbg" id="dbg2"></div>
+    </div>
+
+  </div>
+
+  <div class="options-row">
+    <label class="toggle">
+      <input type="checkbox" id="caseSensitive">
+      <div class="toggle-pill"></div>
+      Case sensitive
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="showExtra">
+      <div class="toggle-pill"></div>
+      Show extras (in target but not reference)
+    </label>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn" id="compareBtn" onclick="compare()" disabled>▶ Compare</button>
+    <button class="btn btn-ghost" onclick="resetAll()">Reset</button>
+  </div>
+</div>
+
+<div class="card" id="results">
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-value" id="stat-ref">0</div><div class="stat-label">In Reference</div></div>
+    <div class="stat"><div class="stat-value" id="stat-target">0</div><div class="stat-label">In Target</div></div>
+    <div class="stat"><div class="stat-value danger" id="stat-missing">0</div><div class="stat-label">Missing</div></div>
+    <div class="stat" id="stat-extra-wrap" style="display:none">
+      <div class="stat-value safe" id="stat-extra">0</div><div class="stat-label">Extra</div>
+    </div>
+  </div>
+  <div id="missing-section">
+    <div class="section-header">
+      <div class="section-title">Missing folders</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="search-input" id="search-missing" placeholder="Filter..." oninput="filterList('missing')">
+        <button class="copy-btn" onclick="copyList('missing')">Copy list</button>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="folder-list" id="missing-list"></div>
+  </div>
+  <div id="extra-section" style="display:none">
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">Extra folders (in target only)</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="search-input" id="search-extra" placeholder="Filter..." oninput="filterList('extra')">
+        <button class="copy-btn" onclick="copyList('extra')">Copy list</button>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="folder-list" id="extra-list"></div>
+  </div>
+</div>
+
+<script>
+  const state = { 1: null, 2: null };
+  let missingData = [], extraData = [];
+
+  function onFilePick(e, zoneNum) {
+    const files = Array.from(e.target.files);
+    const dbg = document.getElementById(`dbg${zoneNum}`);
+
+    if (!files.length) {
+      dbg.textContent = 'No files received.';
+      return;
+    }
+
+    const firstPath = files[0].webkitRelativePath;
+    const rootName = firstPath.split('/')[0];
+
+    // Gather unique immediate subfolders:
+    // Any file whose path has 3+ segments (root/subfolder/file) reveals a subfolder
+    const subfolderSet = new Set();
+    for (const f of files) {
+      const parts = f.webkitRelativePath.split('/');
+      if (parts.length > 2) {
+        subfolderSet.add(parts[1]);
+      }
+    }
+
+    const subfolders = [...subfolderSet].sort((a, b) => a.localeCompare(b));
+
+    dbg.textContent = `${files.length} files | root: "${rootName}" | ${subfolders.length} subfolders`;
+
+    loadZone(zoneNum, rootName, subfolders);
+  }
+
+  function loadZone(zoneNum, rootName, subfolders) {
+    state[zoneNum] = subfolders;
+
+    document.getElementById(`pickarea${zoneNum}`).style.display = 'none';
+    document.getElementById(`badge${zoneNum}-name`).textContent = rootName;
+    document.getElementById(`count${zoneNum}`).textContent = `${subfolders.length} subfolders`;
+    document.getElementById(`loaded${zoneNum}`).classList.add('show');
+
+    const preview = document.getElementById(`preview${zoneNum}`);
+    const MAX = 60;
+
+    if (subfolders.length === 0) {
+      preview.innerHTML = `<div class="warn">⚠ No subfolders found. Does this folder contain subdirectories with files inside them?</div>`;
+    } else {
+      preview.innerHTML =
+        subfolders.slice(0, MAX).map(n => `<div class="preview-item">📁 ${esc(n)}</div>`).join('') +
+        (subfolders.length > MAX ? `<div class="preview-more">…and ${subfolders.length - MAX} more</div>` : '');
+    }
+
+    checkReady();
+  }
+
+  function clearZone(zoneNum) {
+    state[zoneNum] = null;
+    document.getElementById(`pickarea${zoneNum}`).style.display = '';
+    document.getElementById(`loaded${zoneNum}`).classList.remove('show');
+    document.getElementById(`preview${zoneNum}`).innerHTML = '';
+    document.getElementById(`dbg${zoneNum}`).textContent = '';
+    document.getElementById(`input${zoneNum}`).value = '';
+    document.getElementById('results').style.display = 'none';
+    checkReady();
+  }
+
+  function checkReady() {
+    document.getElementById('compareBtn').disabled = !(state[1] !== null && state[2] !== null);
+  }
+
+  function compare() {
+    const cs = document.getElementById('caseSensitive').checked;
+    const showExtra = document.getElementById('showExtra').checked;
+    const norm = s => cs ? s : s.toLowerCase();
+
+    const ref = state[1], target = state[2];
+    const tSet = new Set(target.map(norm));
+    const rSet = new Set(ref.map(norm));
+
+    missingData = ref.filter(f => !tSet.has(norm(f)));
+    extraData = showExtra ? target.filter(f => !rSet.has(norm(f))) : [];
+
+    document.getElementById('stat-ref').textContent = ref.length;
+    document.getElementById('stat-target').textContent = target.length;
+    document.getElementById('stat-missing').textContent = missingData.length;
+    document.getElementById('stat-extra').textContent = extraData.length;
+    document.getElementById('stat-extra-wrap').style.display = showExtra ? '' : 'none';
+    document.getElementById('extra-section').style.display = showExtra ? '' : 'none';
+
+    renderList('missing', missingData);
+    renderList('extra', extraData);
+    document.getElementById('search-missing').value = '';
+    document.getElementById('search-extra').value = '';
+
+    const results = document.getElementById('results');
+    results.style.display = 'block';
+    results.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  function renderList(type, data) {
+    const el = document.getElementById(`${type}-list`);
+    if (!data.length) {
+      el.innerHTML = `<div class="empty-state">No ${type === 'missing' ? 'missing' : 'extra'} folders ✓</div>`;
+      return;
+    }
+    el.innerHTML = data.map((n, i) =>
+      `<div class="folder-item ${type}" style="animation-delay:${Math.min(i*6,300)}ms">
+        <span>📁</span><span>${esc(n)}</span>
+      </div>`
+    ).join('');
+  }
+
+  function filterList(type) {
+    const q = document.getElementById(`search-${type}`).value.toLowerCase();
+    renderList(type, (type==='missing' ? missingData : extraData).filter(n => n.toLowerCase().includes(q)));
+  }
+
+  function copyList(type) {
+    navigator.clipboard.writeText((type==='missing' ? missingData : extraData).join('\n')).then(() => {
+      const b = event.target;
+      b.textContent = 'Copied!';
+      setTimeout(() => b.textContent = 'Copy list', 1500);
+    });
+  }
+
+  function resetAll() { clearZone(1); clearZone(2); }
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
